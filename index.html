@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DPP 802.16t — Throughput &amp; Latency Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF2F8; --panel:#FFFFFF; --panel-2:#F2F6FB; --line:#D3E0ED; --line-2:#B9CEE2;
+  --ink:#0D2B4E; --ink-2:#39587A; --ink-3:#6C87A5;
+  --no-phs:#1A5FA8; --with-phs:#E2711D; --accent:#F08022;
+  --ok:#2E7D5B; --warn:#B07A1E; --bad:#C24A3F;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --disp:'Space Grotesk',var(--sans);
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── Shell ─────────────────────────────── */
+.shell{display:grid;grid-template-columns:330px 1fr;min-height:100vh}
+@media(max-width:960px){.shell{grid-template-columns:1fr}}
+
+/* ── Sidebar ───────────────────────────── */
+.side{background:var(--ink);color:#DCE9F6;padding:0 0 32px;border-right:1px solid var(--line-2)}
+@media(min-width:961px){.side{position:sticky;top:0;height:100vh;overflow-y:auto}}
+.side::-webkit-scrollbar{width:9px}
+.side::-webkit-scrollbar-thumb{background:#235690;border-radius:5px}
+.brand{padding:22px 22px 18px;border-bottom:1px solid #1B4675}
+.brand .eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--accent);text-transform:uppercase}
+.brand h1{font-family:var(--disp);font-size:20px;font-weight:700;letter-spacing:-.01em;margin-top:5px;color:#F2F7FC}
+.brand p{font-size:12px;color:#86A6C4;margin-top:4px}
+.side-actions{display:flex;gap:8px;padding:14px 22px;border-bottom:1px solid #1B4675}
+.btn{border:1px solid #235690;background:#143B66;color:#DCE9F6;border-radius:var(--radius);padding:7px 12px;font-size:12.5px;font-weight:500;cursor:pointer;transition:background .15s}
+.btn:hover{background:#1B4675}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#0D2B4E}
+.btn.primary:hover{background:#FF9440}
+.group{border-bottom:1px solid #1B4675}
+.group>summary{list-style:none;cursor:pointer;padding:13px 22px;display:flex;align-items:center;justify-content:space-between;font-family:var(--disp);font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#B3CCE4;user-select:none}
+.group>summary::-webkit-details-marker{display:none}
+.group>summary::after{content:'+';font-family:var(--mono);color:#5B82A8;font-size:14px}
+.group[open]>summary::after{content:'–'}
+.group[open]>summary{color:#F2F7FC}
+.subhead{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#5B82A8;padding-top:5px;border-top:1px solid #1B4675;margin-top:2px}
+.fields>.subhead:first-child{border-top:none;padding-top:0;margin-top:0}
+.group.inert>summary{color:#5B82A8}
+.group.inert .fields{opacity:.55}
+.inert-note{font-size:11px;line-height:1.4;color:#7196B8;margin:0 0 4px;font-style:italic}
+.fields{padding:2px 22px 16px;display:grid;gap:11px}
+.field label{display:block;font-size:11.5px;color:#8FADC9;margin-bottom:4px}
+.field .unit{color:#5B82A8}
+.field input,.field select{width:100%;background:#082342;border:1px solid #235690;border-radius:var(--radius);color:#EAF2FA;font-family:var(--mono);font-size:13px;padding:7px 9px}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.switch{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.switch label{margin:0;font-size:12.5px;color:#C3D7EB}
+.toggle{position:relative;width:38px;height:21px;flex:none}
+.toggle input{position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;margin:0}
+.toggle span{position:absolute;inset:0;background:#235690;border-radius:20px;transition:background .15s;pointer-events:none}
+.toggle span::after{content:'';position:absolute;top:3px;left:3px;width:15px;height:15px;background:#B3CCE4;border-radius:50%;transition:transform .15s,background .15s}
+.toggle input:checked+span{background:var(--accent)}
+.toggle input:checked+span::after{transform:translateX(17px);background:#0D2B4E}
+.toggle input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ── Main ──────────────────────────────── */
+.main{padding:26px 30px 60px;max-width:1220px}
+
+/* top-level tabs */
+.toptabs{display:flex;gap:2px;border-bottom:1px solid var(--line-2);margin-bottom:20px;flex-wrap:wrap}
+.toptabs button{border:1px solid transparent;border-bottom:none;background:none;padding:10px 20px;font-family:var(--disp);font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--ink-3);cursor:pointer;border-radius:var(--radius) var(--radius) 0 0;margin-bottom:-1px;transition:color .15s,background .15s}
+.toptabs button:hover{color:var(--ink)}
+.toptabs button.on{background:var(--panel);border-color:var(--line-2);border-bottom:1px solid var(--panel);color:var(--ink)}
+.panel{display:none}
+.panel.on{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(max-width:640px){.toptabs button{padding:9px 13px;font-size:13px}}
+
+.traffic-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.tcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.tcard label{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px;font-weight:600}
+.tcard input,.tcard select{width:100%;border:1px solid var(--line-2);border-radius:var(--radius);padding:7px 9px;font-family:var(--mono);font-size:14px;background:#fff}
+.tcard input:focus{border-color:var(--accent)}
+.tcard.locked{background:var(--panel-2)}
+.tcard.locked label{color:var(--ink-3)}
+.tcard.locked label::after{content:' · locked by protocol';font-weight:400;text-transform:none;letter-spacing:0;font-size:10px;color:var(--ink-3)}
+.tcard.locked select{color:var(--ink-3);cursor:not-allowed}
+
+.stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px 14px}
+.stat .k{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+.stat .v{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:3px}
+.stat .v small{font-size:11px;color:var(--ink-3);font-weight:400}
+
+section{margin-bottom:34px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.sec-head h2{font-family:var(--disp);font-size:17px;font-weight:600;letter-spacing:-.01em}
+.sec-head .sub{font-size:12px;color:var(--ink-2)}
+
+/* burst timeline */
+.burst-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.burst-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.burst-row label{font-size:12px;color:var(--ink-2)}
+.burst-row select{border:1px solid var(--line-2);border-radius:var(--radius);padding:5px 8px;font-family:var(--mono);font-size:12.5px;background:#fff}
+.seg-mode{display:inline-flex;border:1px solid var(--line-2);border-radius:var(--radius);overflow:hidden}
+.seg-mode button{border:none;background:#fff;padding:5px 12px;font-size:12px;cursor:pointer;color:var(--ink-2)}
+.seg-mode button.on{background:var(--ink);color:#fff}
+.timeline{width:100%;height:60px;display:flex;border-radius:4px;overflow:hidden;border:1px solid var(--line-2)}
+.timeline .seg{height:100%;position:relative;min-width:2px;transition:width .25s ease}
+.seg.pre{background:repeating-linear-gradient(-45deg,#8FB0CE,#8FB0CE 5px,#7098BD 5px,#7098BD 10px)}
+.seg.ctrl{background:var(--accent)}
+.seg.data{background:var(--no-phs)}
+.seg.data.phs{background:var(--with-phs)}
+.seg.macack{background:#9A5B2E}
+.seg.gap{background:#E4ECF5}
+.tl-legend{display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.tl-legend .sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.tl-meta{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:8px}
+
+/* chart */
+.chart-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px}
+.chart-card svg{width:100%;height:auto;display:block}
+.bar-no{fill:var(--no-phs)} .bar-with{fill:var(--with-phs)}
+.axis{stroke:var(--line-2);stroke-width:1}
+.chart-label{font-family:var(--mono);font-size:10.5px;fill:var(--ink-2)}
+.chart-val{font-family:var(--mono);font-size:10px;fill:var(--ink);font-weight:600}
+
+/* tables */
+.alert{display:flex;gap:10px;align-items:flex-start;border-radius:var(--radius);padding:10px 13px;margin-bottom:10px;font-size:13px;line-height:1.45}
+.alert .ico{font-family:var(--mono);font-weight:700;flex:none;width:17px;height:17px;border-radius:50%;display:grid;place-items:center;font-size:11px;margin-top:1px}
+.alert.err{background:#F8E3E0;color:#8E3328;border:1px solid #E8BDB6}
+.alert.err .ico{background:var(--bad);color:#fff}
+.alert.warn{background:#FAF0DC;color:#7E5612;border:1px solid #EBD6A8}
+.alert.warn .ico{background:var(--warn);color:#fff}
+.qmark{display:inline-grid;place-items:center;width:13px;height:13px;border-radius:50%;background:#235690;color:#C3D7EB;font-size:9px;font-weight:700;margin-left:5px;cursor:help;position:relative;vertical-align:1px;font-family:var(--sans)}
+.qmark:hover,.qmark:focus{background:var(--accent);color:#0D2B4E;outline:none}
+.tipbox{position:fixed;display:none;width:min(290px,calc(100vw - 24px));max-height:calc(100vh - 20px);overflow-y:auto;background:#082342;color:#D9E7F5;border:1px solid #235690;border-radius:var(--radius);padding:10px 12px;font-family:var(--sans);font-size:12px;font-weight:400;line-height:1.55;z-index:9999;box-shadow:0 10px 30px rgba(0,0,0,.5);text-align:left;letter-spacing:0;text-transform:none;pointer-events:none}
+.tipbox.on{display:block}
+.tipbox b{color:#F2F7FC} .tipbox i{color:var(--accent);font-style:normal}
+.tipbox u{color:#86A6C4;text-decoration:none;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase}
+#swChart{width:100%;height:auto;display:block;margin-top:6px}
+#glossTable td{white-space:normal;vertical-align:top}
+#glossTable .gdesc{font-family:var(--sans);font-size:12.5px;text-align:left;max-width:300px;line-height:1.5}
+#glossTable .gmono{font-size:11.5px;color:var(--ink-3)}
+#glossTable td:nth-child(3){text-align:center}
+.gloss-unused{opacity:.5}
+.gloss-unused td:first-child::after{content:' · unused';color:var(--ink-3);font-size:11px;font-weight:400}
+.cmdrow{margin-top:14px}
+.cmdhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;font-size:12px;font-weight:600;color:var(--ink-2)}
+.copybtn{border:1px solid var(--line-2);background:#fff;border-radius:var(--radius);padding:3px 11px;font-size:11.5px;cursor:pointer;color:var(--ink-2)}
+.copybtn:hover{background:var(--panel-2)}
+.cmdrow pre{background:#0D2B4E;color:#D9E7F5;font-family:var(--mono);font-size:12.5px;padding:10px 13px;border-radius:var(--radius);overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.cmdnote{font-size:12px;color:var(--ink-3);margin-top:5px;line-height:1.45}
+.row-invalid td{background:#FCF0EE}
+.row-invalid td:first-child::after{content:' ⚠';color:var(--bad)}
+.tbl-wrap{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:8px 12px;text-align:right;font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+th{font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);background:var(--panel-2);border-bottom:1px solid var(--line);position:sticky;top:0}
+td:first-child,th:first-child{text-align:left}
+td:first-child{font-family:var(--sans);font-weight:500}
+tbody tr{border-bottom:1px solid var(--line)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#F5F9FE}
+.hl-no{color:var(--no-phs)} .hl-with{color:var(--with-phs)}
+.pill{display:inline-block;font-family:var(--sans);font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px}
+.pill.OK{background:#E2F1EA;color:var(--ok)}
+.pill.SyncRisk{background:#F7EBD4;color:var(--warn)}
+.pill.Congested{background:#F6E1DE;color:var(--bad)}
+.note{font-size:12px;color:var(--ink-3);margin-top:7px}
+.tab-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.tab-row button{border:1px solid var(--line-2);background:#fff;border-radius:20px;padding:5px 14px;font-size:12.5px;cursor:pointer;color:var(--ink-2)}
+.tab-row button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.legend-inline{font-size:12px;color:var(--ink-2)}
+.legend-inline b.no{color:var(--no-phs)} .legend-inline b.with{color:var(--with-phs)}
+footer{font-size:11.5px;color:var(--ink-3);border-top:1px solid var(--line);padding-top:14px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ════════ SIDEBAR : SYSTEM CONFIG ════════ -->
+<aside class="side">
+  <div class="brand">
+    <div class="eyebrow">DPP 802.16t · CS-RS</div>
+    <h1>DPP Calculator</h1>
+    <p>Throughput, traffic interval &amp; latency per MCS</p>
+  </div>
+  <div class="side-actions">
+    <button class="btn primary" id="btnDefaults" type="button">Reset</button>
+    <button class="btn" id="btnCSV" type="button">Export CSV</button>
+  </div>
+
+  <details class="group" open>
+    <summary>Frequently Tuned</summary>
+    <div class="fields">
+      <div class="subhead">Burst &amp; airtime</div>
+      <div class="field"><label for="maxCO">Max channel occupancy <span class="unit">(slots)</span></label><input id="maxCO" type="number" step="1"></div>
+      <div class="field"><label for="subchannelsPerGroup">Subchannels per group</label><input id="subchannelsPerGroup" type="number" step="1"></div>
+      <div class="field"><label for="repConfig">Repetition config <span class="unit">(2^n)</span></label>
+        <select id="repConfig"><option value="0">0 — 1×</option><option value="1">1 — 2×</option><option value="2">2 — 4×</option><option value="3">3 — 8×</option></select></div>
+      <div class="field"><label for="minInterBurstGap">Min inter-burst gap <span class="unit">(ms)</span></label><input id="minInterBurstGap" type="number" step="any"></div>
+      <div class="subhead">Peer &amp; ping test</div>
+      <div class="field"><label for="numPeers">Number of peers</label><input id="numPeers" type="number" step="1"></div>
+      <div class="field"><label for="syncMsgInterval">Sync msg interval <span class="unit">(ms)</span></label><input id="syncMsgInterval" type="number" step="any"></div>
+      <div class="field"><label for="pingTestInterval">Ping test interval <span class="unit">(ms)</span></label><input id="pingTestInterval" type="number" step="any"></div>
+      <div class="subhead">Switches</div>
+      <div class="field switch"><label for="packing">Packing</label><span class="toggle"><input id="packing" type="checkbox"><span></span></span></div>
+      <div class="field switch"><label for="ackEnable">MAC ACK enable <span class="unit">(link-layer burst)</span></label><span class="toggle"><input id="ackEnable" type="checkbox"><span></span></span></div>
+      <div class="field switch"><label for="csmaEnable">CSMA enable</label><span class="toggle"><input id="csmaEnable" type="checkbox"><span></span></span></div>
+    </div>
+  </details>
+
+  <details class="group" open>
+    <summary>Occasionally Adjusted</summary>
+    <div class="fields">
+      <div class="field"><label for="robustMCS">Robust MCS</label>
+        <select id="robustMCS"><option>QPSK 1/2</option><option>QPSK 3/4</option><option>16 QAM 1/2</option><option>16 QAM 3/4</option><option>64 QAM 3/4</option><option>64 QAM 5/6</option></select></div>
+      <div class="field"><label for="ctrlMsgBytes">CTRL-MSG bytes</label><input id="ctrlMsgBytes" type="number" step="1"></div>
+      <div class="field"><label for="ctrlMsgSlots">CTRL-MSG slots</label><input id="ctrlMsgSlots" type="number" step="1"></div>
+      <div class="field"><label for="processingDelay">Processing delay <span class="unit">(ms)</span></label><input id="processingDelay" type="number" step="any"></div>
+    </div>
+  </details>
+
+  <details class="group">
+    <summary>Fixed by Hardware</summary>
+    <div class="fields">
+      <div class="field"><label for="subchannelBW">Subchannel spacing / BW <span class="unit">(Hz)</span></label><input id="subchannelBW" type="number" step="any"></div>
+      <div class="field"><label for="cpFactor">CP factor</label>
+        <select id="cpFactor"><option>0.5</option><option>0.25</option><option>0.125</option><option>0.0625</option><option>0.03125</option></select></div>
+      <div class="field"><label for="fftSize">FFT size</label><input id="fftSize" type="number" step="1"></div>
+      <div class="field"><label for="samplingFactor">Sampling factor</label><input id="samplingFactor" type="number" step="any"></div>
+      <div class="field"><label for="symbolsPerBin">Symbols per bin</label><input id="symbolsPerBin" type="number" step="1"></div>
+      <div class="field"><label for="binsPerSlot">Bins per slot</label><input id="binsPerSlot" type="number" step="1"></div>
+      <div class="field"><label for="gainAdjSymbols">Gain adjustment symbols</label><input id="gainAdjSymbols" type="number" step="1"></div>
+      <div class="field"><label for="preambleSymbols">Preamble symbols</label><input id="preambleSymbols" type="number" step="1"></div>
+    </div>
+  </details>
+
+  <details class="group inert">
+    <summary>Not Used in Calculation</summary>
+    <div class="fields">
+      <p class="inert-note">Declared in the system configuration but referenced by no formula — changing these has no effect on results.</p>
+      <div class="field"><label for="pilotsPerBin">Pilots per bin</label><input id="pilotsPerBin" type="number" step="1"></div>
+      <div class="field"><label for="ackSizeBytes">MAC ACK size <span class="unit">(bytes)</span></label><input id="ackSizeBytes" type="number" step="1"></div>
+      <div class="field"><label for="csEntries">CS entries in peers list</label><input id="csEntries" type="number" step="1"></div>
+      <div class="field switch"><label for="fragmentation">Fragmentation</label><span class="toggle"><input id="fragmentation" type="checkbox"><span></span></span></div>
+      <div class="field switch"><label for="authEnabled">Authentication</label><span class="toggle"><input id="authEnabled" type="checkbox"><span></span></span></div>
+    </div>
+  </details>
+</aside>
+
+<!-- ════════ MAIN ════════ -->
+<main class="main">
+
+  <div id="warnBox" aria-live="polite"></div>
+
+  <nav class="toptabs" role="tablist" aria-label="Sections">
+    <button type="button" role="tab" class="on" data-panel="pOverview" aria-selected="true">Overview</button>
+    <button type="button" role="tab" data-panel="pThroughput" aria-selected="false">Throughput</button>
+    <button type="button" role="tab" data-panel="pLatency" aria-selected="false">Latency</button>
+    <button type="button" role="tab" data-panel="pSweep" aria-selected="false">Sweep</button>
+    <button type="button" role="tab" data-panel="pCommands" aria-selected="false">Test Commands</button>
+    <button type="button" role="tab" data-panel="pDerived" aria-selected="false">Derived Params</button>
+    <button type="button" role="tab" data-panel="pGlossary" aria-selected="false">Glossary</button>
+  </nav>
+
+  <div class="traffic-bar">
+    <div class="tcard"><label for="payloadSize">Payload size (bytes)</label><input id="payloadSize" type="number" step="1"></div>
+    <div class="tcard"><label for="dutyCycle">Duty cycle (%)</label><input id="dutyCycle" type="number" step="any" min="1" max="100"></div>
+    <div class="tcard"><label for="protocol">Protocol</label>
+      <select id="protocol"><option value="ICMP">ICMP</option><option value="UDP">UDP</option><option value="TCP">TCP</option></select></div>
+    <div class="tcard"><label for="trafficType">Direction (traffic type)</label>
+      <select id="trafficType"><option value="1">1 — Unidirectional</option><option value="2">2 — Bidirectional</option></select></div>
+    <div class="tcard"><label for="numPairs"># of pairs</label><input id="numPairs" type="number" step="1" min="1"></div>
+  </div>
+
+  <!-- ── Panel: Overview ── -->
+  <div class="panel on" id="pOverview" role="tabpanel">
+    <div class="stat-strip" id="statStrip"></div>
+
+    <section>
+      <div class="sec-head"><h2>Burst anatomy</h2><span class="sub">how one transmit burst spends its airtime</span></div>
+      <div class="burst-card">
+        <div class="burst-row">
+          <label for="tlMcs">MCS</label><select id="tlMcs"></select>
+          <span class="seg-mode" role="group" aria-label="PHS mode">
+            <button type="button" id="tlNo" class="on">No PHS</button>
+            <button type="button" id="tlWith">With PHS</button>
+          </span>
+        </div>
+        <div class="timeline" id="timeline" role="img" aria-label="Burst timeline"></div>
+        <div class="tl-legend">
+          <span><span class="sw" style="background:repeating-linear-gradient(-45deg,#8FB0CE,#8FB0CE 5px,#7098BD 5px,#7098BD 10px)"></span>Gain + preamble</span>
+          <span><span class="sw" style="background:var(--accent)"></span>CTRL-MSG slots</span>
+          <span><span class="sw" id="tlDataSw" style="background:var(--no-phs)"></span>Data slots</span>
+          <span><span class="sw" style="background:#9A5B2E"></span>MAC ACK burst</span>
+          <span><span class="sw" style="background:#E4ECF5"></span>Inter-burst gap</span>
+        </div>
+        <div class="tl-meta" id="tlMeta"></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>Throughput by MCS</h2>
+        <span class="legend-inline">iperf throughput — <b class="no">■ no PHS</b> &nbsp; <b class="with">■ with PHS</b></span></div>
+      <div class="chart-card"><svg id="chart" viewBox="0 0 720 240" preserveAspectRatio="xMidYMid meet" aria-label="Throughput bar chart"></svg></div>
+    </section>
+  </div>
+
+  <!-- ── Panel: Throughput ── -->
+  <div class="panel" id="pThroughput" role="tabpanel">
+    <section>
+      <div class="sec-head"><h2>Throughput &amp; traffic interval</h2><span class="sub">aggregate and per-peer, per MCS</span></div>
+      <div class="tab-row" role="tablist">
+        <button type="button" class="on" data-tab="tpAgg">Aggregate</button>
+        <button type="button" data-tab="tpPeer">Per peer</button>
+        <button type="button" data-tab="tpPkt">Packets / min</button>
+        <button type="button" data-tab="tpDetail">Burst detail</button>
+      </div>
+      <div class="tbl-wrap"><table id="tpTable"></table></div>
+      <p class="note" id="tpNote"></p>
+    </section>
+  </div>
+
+  <!-- ── Panel: Latency ── -->
+  <div class="panel" id="pLatency" role="tabpanel">
+    <section>
+      <div class="sec-head"><h2>Round-trip latency</h2><span class="sub">CS-RS scheme, per peer</span></div>
+      <div class="tab-row" role="tablist">
+        <button type="button" class="on" data-lat="no">No PHS</button>
+        <button type="button" data-lat="with">With PHS</button>
+      </div>
+      <div class="tbl-wrap"><table id="rttTable"></table></div>
+      <p class="note">Best RTT = 2 × one-way burst time + processing delay, plus the MAC ACK burst and inter-burst gap when MAC ACK is enabled. Transport-layer (TCP) ACKs are not part of this figure — they affect packet rate, not burst timing. Status compares the configured ping test interval against the minimum ping interval and the sync-message guard window.</p>
+    </section>
+
+    <section>
+      <div class="sec-head"><h2>One-way latency</h2><span class="sub">CS-RS scheme, per peer</span></div>
+      <div class="tab-row" role="tablist">
+        <button type="button" class="on" data-ow="no">No PHS</button>
+        <button type="button" data-ow="with">With PHS</button>
+      </div>
+      <div class="tbl-wrap"><table id="owTable"></table></div>
+    </section>
+  </div>
+
+  <!-- ── Panel: Sweep ── -->
+  <div class="panel" id="pSweep" role="tabpanel">
+    <section>
+      <div class="sec-head"><h2>Parameter sweep</h2><span class="sub">vary one parameter and watch every MCS respond</span></div>
+      <div class="chart-card">
+        <div class="burst-row">
+          <label for="swParam">Sweep</label><select id="swParam"></select>
+          <label for="swMin">from</label><input id="swMin" type="number" step="any" style="width:90px;border:1px solid var(--line-2);border-radius:var(--radius);padding:5px 8px;font-family:var(--mono);font-size:12.5px">
+          <label for="swMax">to</label><input id="swMax" type="number" step="any" style="width:90px;border:1px solid var(--line-2);border-radius:var(--radius);padding:5px 8px;font-family:var(--mono);font-size:12.5px">
+          <label for="swSteps">steps</label><input id="swSteps" type="number" min="2" max="200" step="1" value="25" style="width:70px;border:1px solid var(--line-2);border-radius:var(--radius);padding:5px 8px;font-family:var(--mono);font-size:12.5px">
+        </div>
+        <div class="burst-row">
+          <label for="swMetric">Metric</label><select id="swMetric"></select>
+          <label for="swPhs">PHS</label><select id="swPhs"><option value="no">No PHS</option><option value="with">With PHS</option></select>
+        </div>
+        <svg id="swChart" viewBox="0 0 760 340" preserveAspectRatio="xMidYMid meet" aria-label="Parameter sweep chart"></svg>
+        <div class="tl-legend" id="swLegend"></div>
+        <div class="tl-meta" id="swMeta"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Panel: Test Commands ── -->
+  <div class="panel" id="pCommands" role="tabpanel">
+    <section>
+      <div class="sec-head"><h2>Test commands</h2><span class="sub">generated from the current configuration</span></div>
+      <div class="burst-card">
+        <div class="burst-row">
+          <label for="cmdMcs">Target MCS</label><select id="cmdMcs"></select>
+          <label for="cmdPhs">PHS</label>
+          <select id="cmdPhs"><option value="no">No PHS</option><option value="with">With PHS</option></select>
+          <label for="cmdHost">Peer address</label>
+          <input id="cmdHost" type="text" value="192.168.1.2" style="border:1px solid var(--line-2);border-radius:var(--radius);padding:5px 8px;font-family:var(--mono);font-size:12.5px;width:140px">
+          <label for="cmdDur">Duration (s)</label>
+          <input id="cmdDur" type="number" value="60" min="1" style="border:1px solid var(--line-2);border-radius:var(--radius);padding:5px 8px;font-family:var(--mono);font-size:12.5px;width:70px">
+        </div>
+        <div id="cmdList"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ── Panel: Derived Params ── -->
+  <div class="panel" id="pDerived" role="tabpanel">
+    <section>
+      <div class="sec-head"><h2>Derived parameters</h2><span class="sub">intermediate values computed from the system config</span></div>
+      <div class="tbl-wrap"><table id="dpTable"></table></div>
+    </section>
+  </div>
+
+
+  <!-- ── Panel: Glossary ── -->
+  <div class="panel" id="pGlossary" role="tabpanel">
+    <section>
+      <div class="sec-head"><h2>Parameter glossary</h2><span class="sub">what each input means and which results it moves</span></div>
+      <div class="tbl-wrap"><table id="glossTable">
+        <thead><tr><th>Parameter</th><th>Code name</th><th>Units</th><th>Description</th><th>Drives</th></tr></thead>
+        <tbody id="glossBody"></tbody>
+      </table></div>
+      <p class="note">Rows in grey are declared in the system configuration but referenced by no formula, so changing them has no effect on any result.</p>
+    </section>
+  </div>
+
+  <footer>
+    PHS = payload header suppression (32 bytes suppressed). Two distinct acknowledgment mechanisms are modelled: the <b>MAC ACK</b> is a link-layer burst costing airtime (ms) and affects latency; the <b>TCP ACK</b> is a 40-byte transport packet costing bits and affects packet rate only. Traffic-interval figures include the ARP packet-duration term. TCP packets/min assume 40-byte TCP ACKs sharing bandwidth.
+  </footer>
+</main>
+</div>
+
+<script>
+/* ════════ CALCULATION ENGINE ════════ */
+const PROTOCOLS={
+  ICMP:{hdr:8, ackBits:0, forceBidirectional:true,   label:'ICMP (8 B header)',      note:'ICMP echo header is 8 bytes and there is no transport ACK; the reply is the payload itself, so Direction is locked to bidirectional. The MAC ACK burst (sidebar) is a separate link-layer mechanism and still applies if enabled.'},
+  UDP: {hdr:8, ackBits:0,   label:'UDP (8 B header)',       note:'UDP has no transport ACK, so packets/min is limited purely by payload airtime. The MAC ACK burst (sidebar) still applies if enabled.'},
+  TCP: {hdr:20,ackBits:320, label:'TCP (20 B header)',      note:'TCP adds a 12-byte-larger header than UDP plus a 40-byte transport ACK packet, which lowers PDU efficiency and packet rate. This is separate from the MAC ACK burst toggle in the sidebar — the two are independent and both apply if enabled.'},
+};
+
+const MCS_TABLE=[
+  {name:'QPSK 1/2', fec:0,bytesPerSlot:6},
+  {name:'QPSK 3/4', fec:1,bytesPerSlot:9},
+  {name:'16 QAM 1/2',fec:2,bytesPerSlot:12},
+  {name:'16 QAM 3/4',fec:3,bytesPerSlot:18},
+  {name:'64 QAM 3/4',fec:4,bytesPerSlot:27},
+  {name:'64 QAM 5/6',fec:5,bytesPerSlot:30},
+];
+
+function compute(cfgIn){
+  const PROTO=PROTOCOLS[cfgIn.protocol]||PROTOCOLS.UDP;
+  // ICMP echo is request/reply, so direction is always bidirectional
+  const c=PROTO.forceBidirectional?{...cfgIn,trafficType:2}:cfgIn;
+  const pduHeader=8,concat=0,eth=14,ip=20,transport=PROTO.hdr;
+  const ovhConcat=pduHeader+concat+eth+ip+transport;    // UDP/ICMP 50, TCP 62
+  const suppressed=32;
+  const packingSub=c.packing?3:0;
+  const ovhPacking=ovhConcat+packingSub;
+
+  const symbolSize=c.fftSize+c.fftSize*c.cpFactor;
+  const samplingRate=c.subchannelBW*c.fftSize*c.samplingFactor;
+  const symbolDuration_us=(symbolSize/samplingRate)*1e6;
+  const symbolsPerSlot=c.symbolsPerBin*c.binsPerSlot;
+  const samplesPerSlot=c.binsPerSlot*c.symbolsPerBin*symbolSize;
+  const slotDuration_ms=1000*samplesPerSlot/samplingRate;
+  const robustBytesPerSlot=(MCS_TABLE.find(m=>m.name===c.robustMCS)||MCS_TABLE[0]).bytesPerSlot;
+  const slotsCtrlMsg=Math.ceil(c.ctrlMsgBytes/robustBytesPerSlot);
+  const symGainPreamble=c.gainAdjSymbols+c.preambleSymbols;
+  const symGainSyncCtrl=symGainPreamble+slotsCtrlMsg*symbolsPerSlot;
+  const samplesGSC=symGainSyncCtrl*symbolSize;
+  const slotsGSC=samplesGSC/(symbolsPerSlot*symbolSize);
+  const burstDurMaxCO=1000*c.maxCO*symbolsPerSlot*symbolSize/samplingRate;
+  const slotsDataPerBurst=c.maxCO-Math.ceil(slotsGSC);
+  const burstDurWithGap=burstDurMaxCO+c.minInterBurstGap;
+  const burstsPerSec=1000/burstDurWithGap;
+  const dataSlotsPerSec=Math.floor(slotsDataPerBurst*burstsPerSec);
+  const repetitions=Math.pow(2,c.repConfig);
+  const slotsAvailRep=(c.maxCO>>c.repConfig)-c.ctrlMsgSlots;
+  const ackSyncSlots=2;
+  const ackBurstDur=1000*((symGainPreamble+ackSyncSlots*symbolsPerSlot)*symbolSize)/samplingRate;
+  const burstDurCode=1000*((symGainPreamble+symbolsPerSlot)*symbolSize)/samplingRate;
+
+  const D={transport,ovhConcat,ovhPacking,suppressed,symbolSize,samplingRate,symbolDuration_us,symbolsPerSlot,samplesPerSlot,slotDuration_ms,
+    robustBytesPerSlot,slotsCtrlMsg,symGainPreamble,symGainSyncCtrl,samplesGSC,slotsGSC,burstDurMaxCO,
+    slotsDataPerBurst,burstDurWithGap,burstsPerSec,dataSlotsPerSec,repetitions,slotsAvailRep,
+    ackSyncSlots,ackBurstDur,burstDurCode};
+
+  // ARP packet duration term.
+  // Row for QPSK 1/2 uses the configured repetition factor; other rows use 0.
+  const refL=MCS_TABLE.map((m,i)=>{
+    const F=(i===0)?c.repConfig:0;
+    const J=Math.ceil(72/m.bytesPerSlot)*repetitions;
+    const K=((J*54)+197)*Math.pow(2,F);
+    return ((K*72)/800000)/10;   // seconds — fixed constants
+  });
+
+  const ackTerm=c.ackEnable?ackBurstDur:0;
+
+  const rows=MCS_TABLE.map((m,i)=>{
+    const d=m.bytesPerSlot;
+    const E=((c.maxCO>>c.repConfig)-c.ctrlMsgSlots)*d-ovhConcat;
+    const F=c.payloadSize+ovhPacking;
+    const G=F-suppressed;
+    const H=c.packing?Math.floor((slotsAvailRep*d)/F)*F:d*Math.ceil(F/d);
+    const I=c.packing?Math.floor((slotsAvailRep*d)/G)*G:d*Math.ceil(G/d);
+    const J=d*Math.ceil(H/d);
+    const K=d*Math.ceil(I/d);
+    const L=Math.round(((slotsCtrlMsg+J/d)*repetitions)/c.subchannelsPerGroup);
+    const M=Math.round(((slotsCtrlMsg+K/d)*repetitions)/c.subchannelsPerGroup);
+    const N=1000*((symGainPreamble+L*symbolsPerSlot)*symbolSize)/samplingRate;
+    const O=1000*((symGainPreamble+M*symbolsPerSlot)*symbolSize)/samplingRate;
+    const P=1000/(N+ackTerm+c.minInterBurstGap);
+    const Q=1000/(O+ackTerm+c.minInterBurstGap);
+    const R=(H/F)*P*(c.dutyCycle/100);
+    const S=(I/G)*Q*(c.dutyCycle/100);
+    const T=Math.floor((R*c.payloadSize*8)/(c.trafficType*c.numPairs));
+    const U=Math.floor((S*c.payloadSize*8)/(c.trafficType*c.numPairs));
+    const V=((N+ackTerm)*100*c.trafficType*c.numPairs/(c.dutyCycle*1000))+refL[i];
+    const W=((O+ackTerm)*100*c.trafficType*c.numPairs/(c.dutyCycle*1000))+refL[i];
+    const syncFactor=1-(ackSyncSlots*slotDuration_ms)/c.syncMsgInterval;
+    const Y=Math.floor(T/c.numPeers*syncFactor);
+    const Z=Math.floor(U/c.numPeers*syncFactor);
+    const invFactor=c.syncMsgInterval/(c.syncMsgInterval-ackSyncSlots*slotDuration_ms);
+    const AA=V*c.numPeers*invFactor;
+    const AB=W*c.numPeers*invFactor;
+    const ackBits=PROTO.ackBits;
+    const pktNo=Math.floor((T*60)/(F*8)),pktWith=Math.floor((U*60)/(G*8));
+    const pktAckNo=Math.floor((T*60)/(F*8+ackBits)),pktAckWith=Math.floor((U*60)/(G*8+ackBits));
+    const bestRTT_no=2*(N+ackTerm)+(c.ackEnable?c.minInterBurstGap:0)+c.processingDelay;
+    const bestRTT_with=2*(O+ackTerm)+(c.ackEnable?c.minInterBurstGap:0)+c.processingDelay;
+    const avgRTT_no=(c.csmaEnable?0.5:1)*AA*1000+bestRTT_no;
+    const worstRTT_no=(c.csmaEnable?1:2)*AA*1000+bestRTT_no;
+    const avgRTT_with=(c.csmaEnable?0.5:1)*AB*1000+bestRTT_with;
+    const worstRTT_with=(c.csmaEnable?1:2)*AB*1000+bestRTT_with;
+    const minPing_no=AA*1000,minPing_with=AB*1000;
+    const status=mp=>{
+      if(c.pingTestInterval<mp)return'Congested';
+      const mod=c.pingTestInterval%c.syncMsgInterval,guard=slotDuration_ms*2;
+      if(mod<guard||(c.syncMsgInterval<c.pingTestInterval&&mod>(c.syncMsgInterval-guard)))return'Sync Risk';
+      return'OK';
+    };
+    const bestOW_no=N+ackTerm,bestOW_with=O+ackTerm;
+    const avgOW_no=(c.csmaEnable?0.25:0.5)*AA*1000+bestOW_no;
+    const worstOW_no=(c.csmaEnable?0.5:1)*AA*1000+bestOW_no;
+    const avgOW_with=(c.csmaEnable?0.25:0.5)*AB*1000+bestOW_with;
+    const worstOW_with=(c.csmaEnable?0.5:1)*AB*1000+bestOW_with;
+    const overNo=(L>c.maxCO)||(F>E), overWith=(M>c.maxCO)||(G>E);
+    return {overNo,overWith,
+      mcs:m.name,fec:m.fec,bytesPerSlot:d,maxPayload:E,pduNo:F,pduWith:G,
+      burstBytesNo:H,burstBytesWith:I,slotsNo:L,slotsWith:M,burstDurNo:N,burstDurWith:O,
+      burstsPerSecNo:P,burstsPerSecWith:Q,pdusPerSecNo:R,pdusPerSecWith:S,
+      iperfNo:T,iperfWith:U,trafficIntNo:V,trafficIntWith:W,
+      perPeerNo:Y,perPeerWith:Z,trafficIntPeerNo:AA,trafficIntPeerWith:AB,
+      pktNo,pktWith,pktAckNo,pktAckWith,
+      bestRTT_no,bestRTT_with,avgRTT_no,worstRTT_no,avgRTT_with,worstRTT_with,
+      minPing_no,minPing_with,statusNo:status(minPing_no),statusWith:status(minPing_with),
+      bestOW_no,bestOW_with,avgOW_no,worstOW_no,avgOW_with,worstOW_with};
+  });
+  // ---- configuration sanity checks ----
+  const warn=[];
+  if(c.dutyCycle<=0||c.dutyCycle>100) warn.push({lvl:'err',msg:`Duty cycle is ${c.dutyCycle}% — must be between 1 and 100.`});
+  if(slotsAvailRep<=0) warn.push({lvl:'err',msg:`No slots left for data: max CO (${c.maxCO}) at ${repetitions}x repetition leaves ${slotsAvailRep} slots after ${c.ctrlMsgSlots} CTRL-MSG slots. Reduce repetition or CTRL-MSG slots.`});
+  if(slotsDataPerBurst<=0) warn.push({lvl:'err',msg:`Gain, preamble and control overhead (${Math.ceil(slotsGSC)} slots) exceeds max channel occupancy (${c.maxCO} slots).`});
+  if(c.syncMsgInterval<=ackSyncSlots*slotDuration_ms) warn.push({lvl:'err',msg:`Sync msg interval (${c.syncMsgInterval} ms) must exceed the sync burst itself (${(ackSyncSlots*slotDuration_ms).toFixed(2)} ms), or per-peer figures are meaningless.`});
+  if(c.numPeers<1||c.numPairs<1) warn.push({lvl:'err',msg:'Number of peers and number of pairs must each be at least 1.'});
+  const overRows=rows.filter(r=>r.overNo);
+  if(overRows.length) warn.push({lvl:'warn',msg:`Payload of ${c.payloadSize} B does not fit one burst at ${overRows.map(r=>r.mcs).join(', ')} — the PDU exceeds the per-burst capacity, so those rows assume a burst longer than max CO allows. Fragmentation would be required in a real link.`});
+  if(c.ctrlMsgSlots*repetitions>=c.maxCO) warn.push({lvl:'warn',msg:'CTRL-MSG slots after repetition consume the whole channel occupancy.'});
+  return {derived:D,refL,rows,warn};
+}
+
+
+/* ════════ PARAMETER HELP — single source for tooltips and glossary ════════ */
+const HELP={
+ subchannelBW:{u:'Hz',d:'Spacing between OFDM subcarriers. With FFT size and sampling factor it sets the sampling rate, which fixes how long every symbol and slot lasts.',drives:'Sampling rate → slot duration → every timing figure'},
+ cpFactor:{u:'ratio',d:'Cyclic prefix length as a fraction of the FFT size. A longer CP resists multipath better but adds airtime to every symbol.',drives:'Symbol size → slot duration → throughput and latency'},
+ fftSize:{u:'samples',d:'Number of FFT points per OFDM symbol. Together with the CP it gives the symbol size in samples.',drives:'Symbol size and sampling rate'},
+ samplingFactor:{u:'×',d:'Oversampling multiplier applied to the nominal sampling rate.',drives:'Sampling rate'},
+ symbolsPerBin:{u:'symbols',d:'OFDM symbols contained in one bin, the smallest scheduling unit in frequency.',drives:'Symbols per slot → slot duration'},
+ binsPerSlot:{u:'bins',d:'Bins making up one slot. Slot is the unit the MAC allocates data in.',drives:'Symbols per slot → slot duration'},
+ pilotsPerBin:{u:'pilots',d:'Pilot subcarriers per bin, used for channel estimation. Declared in the configuration but no formula reads it.',drives:'Nothing — not modelled'},
+ gainAdjSymbols:{u:'symbols',d:'Symbols at the start of a burst for the receiver AGC to settle. Pure overhead paid once per burst.',drives:'Burst duration → bursts per second'},
+ preambleSymbols:{u:'symbols',d:'Synchronisation preamble symbols at the head of each burst. Also per-burst overhead.',drives:'Burst duration → bursts per second'},
+ maxCO:{u:'slots',d:'Maximum channel occupancy: the longest a node may hold the channel in one burst. The regulatory or MAC ceiling on burst length.',drives:'Slots available for data, max payload, burst duration'},
+ minInterBurstGap:{u:'ms',d:'Mandatory idle time between consecutive bursts, letting other nodes contend.',drives:'Bursts per second → throughput; RTT when MAC ACK is on'},
+ repConfig:{u:'2^n',d:'Repetition factor for robustness: 0 means 1×, 3 means 8×. Each repetition multiplies airtime for the same payload, so range improves and throughput falls.',drives:'Slots available, max payload, throughput — strongly'},
+ subchannelsPerGroup:{u:'count',d:'Subchannels transmitted in parallel as one group. Dividing slots across more subchannels shortens the burst.',drives:'Slots per burst → burst duration'},
+ ctrlMsgBytes:{u:'bytes',d:'Size of the control message sent at the head of each burst. Carried at the robust MCS, not the data MCS.',drives:'Slots consumed by control overhead'},
+ ctrlMsgSlots:{u:'slots',d:'Slots reserved for control messaging out of the channel occupancy.',drives:'Slots left for data payload'},
+ robustMCS:{u:'',d:'Modulation and coding used for control messages, normally the most robust scheme so every peer can decode it.',drives:'Bytes per slot for control → control slot count'},
+ packing:{u:'on/off',d:'Pack multiple PDUs into one burst instead of padding a single PDU to a slot boundary. Adds a 3-byte subheader but wastes far less airtime on small payloads.',drives:'Bytes per burst → throughput, strongly for small payloads'},
+ fragmentation:{u:'on/off',d:'Split a PDU too large for one burst across several bursts. Declared in the configuration but no formula reads it, so oversized payloads are flagged rather than fragmented.',drives:'Nothing — not modelled'},
+ ackEnable:{u:'on/off',d:'Link-layer acknowledgment burst after each data burst. Costs airtime in milliseconds. Distinct from a TCP ACK, which is a transport packet costing bits.',drives:'Burst cycle time → throughput and RTT'},
+ ackSizeBytes:{u:'bytes',d:'Size of the MAC ACK. Declared in the configuration but unused — the ACK burst is modelled as a fixed 2 slots.',drives:'Nothing — not modelled'},
+ authEnabled:{u:'on/off',d:'Authentication flag. Declared in the configuration but no formula reads it.',drives:'Nothing — not modelled'},
+ syncMsgInterval:{u:'ms',d:'How often the network-wide sync message is sent. Its airtime is deducted from what peers can use, and it defines the guard window behind the Sync Risk status.',drives:'Per-peer throughput; Sync Risk detection'},
+ numPeers:{u:'count',d:'Peers sharing the channel. Aggregate throughput is divided among them and the per-peer traffic interval scales with it.',drives:'Per-peer throughput, traffic interval, average and worst RTT'},
+ csmaEnable:{u:'on/off',d:'Carrier-sense multiple access. When on, a node may seize the channel as soon as it is idle, halving the expected wait; when off, access is scheduled and the wait is a full cycle.',drives:'Average and worst RTT only — not throughput'},
+ csEntries:{u:'count',d:'Carrier-sense entries in the peers list. Declared in the configuration but no formula reads it.',drives:'Nothing — not modelled'},
+ pingTestInterval:{u:'ms',d:'Interval between ping packets in your latency test. Compared against the minimum sustainable interval to flag congestion, and against the sync window to flag collision risk.',drives:'Status column: OK / Sync Risk / Congested'},
+ processingDelay:{u:'ms',d:'Fixed host-side processing time added to every round trip, independent of the air link.',drives:'Best, average and worst RTT'},
+ payloadSize:{u:'bytes',d:'Application payload per packet, before protocol headers. Larger payloads amortise per-burst overhead better, up to the per-burst capacity limit.',drives:'PDU size → slots → throughput and latency'},
+ dutyCycle:{u:'%',d:'Share of time the transmitter is permitted to be active, typically a regulatory limit.',drives:'Throughput and traffic interval, proportionally'},
+ trafficType:{u:'1 or 2',d:'Direction: 1 unidirectional, 2 bidirectional. Bidirectional halves throughput per direction because the channel is shared. Locked to 2 for ICMP.',drives:'Throughput and traffic interval'},
+ numPairs:{u:'count',d:'Concurrent communicating pairs sharing the channel.',drives:'Throughput per pair, traffic interval'},
+ protocol:{u:'',d:'Transport protocol. Sets the transport header carried in every PDU: ICMP 8 B, UDP 8 B, TCP 20 B. TCP additionally pays a 40-byte ACK per packet.',drives:'PDU overhead → throughput, slots, packet rate'},
+};
+
+/* ════════ DEFAULTS ════════ */
+const DEFAULTS={subchannelBW:12500,cpFactor:0.125,fftSize:64,samplingFactor:1,
+  gainAdjSymbols:70,preambleSymbols:127,maxCO:220,minInterBurstGap:50,authEnabled:0,
+  ctrlMsgBytes:12,symbolsPerBin:9,pilotsPerBin:1,binsPerSlot:6,subchannelsPerGroup:1,
+  robustMCS:'QPSK 1/2',repConfig:0,ctrlMsgSlots:2,packing:0,fragmentation:1,ackEnable:0,
+  syncMsgInterval:1000,numPeers:5,ackSizeBytes:12,csmaEnable:0,csEntries:5,
+  pingTestInterval:12500,processingDelay:100,
+  payloadSize:64,dutyCycle:50,trafficType:2,numPairs:1,protocol:'UDP'};
+const BOOLS=['authEnabled','packing','fragmentation','ackEnable','csmaEnable'];
+const SELECT_NUM=['cpFactor','repConfig','trafficType'];
+
+/* ════════ UI STATE ════════ */
+let tpTab='tpAgg',latMode='no',owMode='no',tlPhs='no',tlMcsIdx=0;
+
+const $=id=>document.getElementById(id);
+function setForm(cfg){
+  for(const k in DEFAULTS){
+    const el=$(k); if(!el)continue;
+    if(BOOLS.includes(k))el.checked=!!cfg[k];
+    else el.value=cfg[k];
+  }
+}
+function applyProtocolConstraints(){
+  const proto=$('protocol').value, dir=$('trafficType');
+  if(proto==='ICMP'){
+    dir.value='2';
+    dir.disabled=true;
+    dir.title='ICMP echo request/reply is inherently bidirectional';
+    dir.closest('.tcard').classList.add('locked');
+  }else{
+    dir.disabled=false;
+    dir.title='';
+    dir.closest('.tcard').classList.remove('locked');
+  }
+}
+
+function readForm(){
+  const c={};
+  for(const k in DEFAULTS){
+    const el=$(k); if(!el){c[k]=DEFAULTS[k];continue;}
+    if(BOOLS.includes(k))c[k]=el.checked?1:0;
+    else if(k==='robustMCS'||k==='protocol')c[k]=el.value;
+    else c[k]=parseFloat(el.value);
+    if(k!=='robustMCS'&&(!isFinite(c[k])))c[k]=DEFAULTS[k];
+  }
+  // basic guards against divide-by-zero
+  if(c.dutyCycle<=0)c.dutyCycle=DEFAULTS.dutyCycle;
+  if(c.numPairs<1)c.numPairs=1;
+  if(c.numPeers<1)c.numPeers=1;
+  if(c.syncMsgInterval<=0)c.syncMsgInterval=DEFAULTS.syncMsgInterval;
+  if(c.protocol==='ICMP')c.trafficType=2;   // echo request/reply is inherently bidirectional
+  return c;
+}
+
+/* ════════ FORMATTERS ════════ */
+const f0=x=>isFinite(x)?Math.round(x).toLocaleString():'—';
+const f2=x=>isFinite(x)?x.toFixed(2):'—';
+const f3=x=>isFinite(x)?x.toFixed(3):'—';
+const kbps=x=>isFinite(x)?(x>=1000?(x/1000).toFixed(2)+' kbps':Math.round(x)+' bps'):'—';
+
+/* ════════ RENDER ════════ */
+function render(){
+  applyProtocolConstraints();
+  const cfg=readForm();
+  const res=compute(cfg);
+  renderWarnings(res);
+  renderStats(cfg,res);
+  renderTimeline(cfg,res);
+  renderChart(res);
+  renderThroughput(res);
+  renderRTT(res);
+  renderOW(res);
+  renderCommands(cfg,res);
+  renderSweep(cfg);
+  renderDerived(res);
+  renderGlossary();
+}
+
+function renderWarnings(res){
+  const w=res.warn||[];
+  if(!w.length){$('warnBox').innerHTML='';return;}
+  $('warnBox').innerHTML=w.map(x=>
+    `<div class="alert ${x.lvl}"><span class="ico">${x.lvl==='err'?'!':'\u26A0'}</span><span>${x.msg}</span></div>`).join('');
+}
+
+
+function renderCommands(cfg,res){
+  const i=+($('cmdMcs').value||0), row=res.rows[i]||res.rows[0];
+  const phs=$('cmdPhs').value==='with';
+  const host=($('cmdHost').value||'<peer-ip>').trim();
+  const dur=Math.max(1,parseInt($('cmdDur').value||'60',10));
+  const rate=phs?row.iperfWith:row.iperfNo;
+  const perPeer=phs?row.perPeerWith:row.perPeerNo;
+  const interval=phs?row.trafficIntWith:row.trafficIntNo;
+  const minPing=phs?row.minPing_with:row.minPing_no;
+  const proto=cfg.protocol;
+  const cmds=[];
+
+  if(proto==='TCP'){
+    cmds.push({t:'iperf3 server (on peer)',c:`iperf3 -s`});
+    cmds.push({t:`iperf3 TCP client — ${row.mcs}`,
+      c:`iperf3 -c ${host} -t ${dur} -l ${cfg.payloadSize} -b ${rate}`,
+      n:`TCP mode. -b caps the offered load at the calculated ${rate} bps so the link is not driven into congestion.`});
+  }else if(proto==='UDP'){
+    cmds.push({t:'iperf3 server (on peer)',c:`iperf3 -s`});
+    cmds.push({t:`iperf3 UDP client — ${row.mcs}`,
+      c:`iperf3 -c ${host} -u -t ${dur} -l ${cfg.payloadSize} -b ${rate}`,
+      n:`Offered load set to the calculated ${rate} bps. Raising -b beyond this will show loss rather than more throughput.`});
+  }else{
+    cmds.push({t:`ping (ICMP) — ${row.mcs}`,
+      c:`ping -c ${Math.max(1,Math.floor(dur/(cfg.pingTestInterval/1000)))} -i ${(cfg.pingTestInterval/1000).toFixed(3)} -s ${cfg.payloadSize} ${host}`,
+      n:`-s is the ICMP payload; total frame adds 8 B ICMP + 20 B IP. Interval ${(cfg.pingTestInterval/1000).toFixed(3)} s is above the ${(minPing/1000).toFixed(3)} s minimum for this MCS.`});
+  }
+
+  cmds.push({t:'Latency check (ping)',
+    c:`ping -c ${Math.max(1,Math.floor(dur/(cfg.pingTestInterval/1000)))} -i ${(cfg.pingTestInterval/1000).toFixed(3)} -s ${cfg.payloadSize} ${host}`,
+    n:`Expect ~${(phs?row.avgRTT_with:row.avgRTT_no).toFixed(0)} ms average, ${(phs?row.worstRTT_with:row.worstRTT_no).toFixed(0)} ms worst case. Below ${(minPing/1000).toFixed(3)} s interval the link congests.`});
+
+  cmds.push({t:'Per-peer rate (multi-peer run)',
+    c:`iperf3 -c ${host} ${proto==='TCP'?'':'-u '}-t ${dur} -l ${cfg.payloadSize} -b ${perPeer}`,
+    n:`${perPeer} bps per peer across ${cfg.numPeers} peers, after the sync-message deduction.`});
+
+  let html='';
+  if(phs?row.overWith:row.overNo)
+    html+=`<div class="alert warn" style="margin:10px 0"><span class="ico">\u26A0</span><span>This MCS cannot carry a ${cfg.payloadSize} B payload in one burst — the commands below describe a configuration the link cannot actually sustain.</span></div>`;
+  html+=cmds.map((x,k)=>`
+    <div class="cmdrow">
+      <div class="cmdhead"><span>${x.t}</span><button type="button" class="copybtn" data-cmd="${k}">Copy</button></div>
+      <pre id="cmd${k}">${x.c}</pre>
+      ${x.n?`<div class="cmdnote">${x.n}</div>`:''}
+    </div>`).join('');
+  html+=`<div class="cmdnote" style="margin-top:14px">Traffic interval for this MCS is ${interval.toFixed(6)} s. Figures assume duty cycle ${cfg.dutyCycle}%, ${cfg.trafficType===2?'bidirectional':'unidirectional'} traffic, ${cfg.numPairs} pair(s).</div>`;
+  $('cmdList').innerHTML=html;
+  document.querySelectorAll('.copybtn').forEach(b=>b.addEventListener('click',()=>{
+    const txt=$('cmd'+b.dataset.cmd).textContent;
+    navigator.clipboard?.writeText(txt).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1200);})
+      .catch(()=>{b.textContent='Select manually';setTimeout(()=>b.textContent='Copy',1600);});
+  }));
+}
+
+function csvEscape(v){const t=String(v);return /[",\n]/.test(t)?'"'+t.replace(/"/g,'""')+'"':t;}
+function downloadCSV(){
+  const cfg=readForm(),res=compute(cfg);
+  const L=[];
+  L.push(['DPP 802.16t calculator export']);
+  L.push(['generated',new Date().toISOString()]);
+  L.push([]);
+  L.push(['CONFIGURATION']);
+  Object.keys(DEFAULTS).forEach(k=>L.push([k,cfg[k]]));
+  L.push([]);
+  L.push(['DERIVED PARAMETERS']);
+  Object.entries(res.derived).forEach(([k,v])=>L.push([k,v]));
+  L.push([]);
+  L.push(['RESULTS BY MCS']);
+  const cols=['mcs','bytesPerSlot','maxPayload','pduNo','pduWith','slotsNo','slotsWith',
+    'burstDurNo','burstDurWith','burstsPerSecNo','burstsPerSecWith','iperfNo','iperfWith',
+    'trafficIntNo','trafficIntWith','perPeerNo','perPeerWith','trafficIntPeerNo','trafficIntPeerWith',
+    'pktNo','pktWith','pktAckNo','pktAckWith','bestRTT_no','avgRTT_no','worstRTT_no',
+    'bestRTT_with','avgRTT_with','worstRTT_with','minPing_no','minPing_with','statusNo','statusWith',
+    'bestOW_no','avgOW_no','worstOW_no','bestOW_with','avgOW_with','worstOW_with','overNo','overWith'];
+  L.push(cols);
+  res.rows.forEach(r=>L.push(cols.map(c=>r[c])));
+  if(res.warn&&res.warn.length){L.push([]);L.push(['WARNINGS']);res.warn.forEach(w=>L.push([w.lvl,w.msg]));}
+  const csv=L.map(r=>r.map(csvEscape).join(',')).join('\n');
+  const filename=`dpp_calc_${cfg.protocol}_${cfg.payloadSize}B_${new Date().toISOString().slice(0,10)}.csv`;
+  saveFile(filename,csv);
+}
+
+// Works in two environments: a local .html file uses a Blob download;
+// a published artifact page must go through the downloads capability.
+let dlCap;
+async function getDownloads(){
+  if(dlCap!==undefined)return dlCap;
+  try{ dlCap=(window.claude&&claude.use)?await claude.use('downloads'):null; }
+  catch(e){ dlCap=null; }
+  return dlCap;
+}
+async function saveFile(filename,text){
+  const btn=$('btnCSV'), restore=t=>{if(btn){btn.textContent=t;setTimeout(()=>btn.textContent='Export CSV',1800);}};
+  const cap=await getDownloads();
+  if(cap){
+    try{ await cap.save({filename,data:text}); restore('Saved'); }
+    catch(err){ restore(err&&err.code==='declined'?'Cancelled':'Save failed'); }
+    return;
+  }
+  try{
+    const blob=new Blob([text],{type:'text/csv;charset=utf-8;'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    restore('Saved');
+  }catch(e){ restore('Save failed'); }
+}
+
+
+/* ════════ PARAMETER SWEEP ════════ */
+const SWEEPABLE=[
+ {k:'payloadSize',n:'Payload size (B)',min:32,max:1500,int:true},
+ {k:'maxCO',n:'Max channel occupancy (slots)',min:20,max:500,int:true},
+ {k:'dutyCycle',n:'Duty cycle (%)',min:1,max:100,int:false},
+ {k:'numPeers',n:'Number of peers',min:1,max:50,int:true},
+ {k:'numPairs',n:'Number of pairs',min:1,max:20,int:true},
+ {k:'minInterBurstGap',n:'Min inter-burst gap (ms)',min:0,max:500,int:false},
+ {k:'repConfig',n:'Repetition config (0-3)',min:0,max:3,int:true},
+ {k:'ctrlMsgSlots',n:'CTRL-MSG slots',min:0,max:40,int:true},
+ {k:'subchannelsPerGroup',n:'Subchannels per group',min:1,max:16,int:true},
+ {k:'syncMsgInterval',n:'Sync msg interval (ms)',min:50,max:5000,int:false},
+ {k:'processingDelay',n:'Processing delay (ms)',min:0,max:500,int:false},
+];
+const METRICS=[
+ {k:'iperf',   n:'iperf throughput (bps)',    f:(r,w)=>w?r.iperfWith:r.iperfNo},
+ {k:'perPeer', n:'Per-peer throughput (bps)', f:(r,w)=>w?r.perPeerWith:r.perPeerNo},
+ {k:'avgRTT',  n:'Average RTT (ms)',          f:(r,w)=>w?r.avgRTT_with:r.avgRTT_no},
+ {k:'worstRTT',n:'Worst RTT (ms)',            f:(r,w)=>w?r.worstRTT_with:r.worstRTT_no},
+ {k:'bestRTT', n:'Best RTT (ms)',             f:(r,w)=>w?r.bestRTT_with:r.bestRTT_no},
+ {k:'avgOW',   n:'Average one-way (ms)',      f:(r,w)=>w?r.avgOW_with:r.avgOW_no},
+ {k:'trafInt', n:'Traffic interval/peer (s)', f:(r,w)=>w?r.trafficIntPeerWith:r.trafficIntPeerNo},
+ {k:'pkts',    n:'Packets per minute',        f:(r,w)=>w?r.pktWith:r.pktNo},
+ {k:'slots',   n:'Slots per burst',           f:(r,w)=>w?r.slotsWith:r.slotsNo},
+];
+const SERIES_COLORS=['#0D2B4E','#1A5FA8','#4E92D6','#8FAFC9','#F08022','#B2491A'];
+
+function renderSweep(cfg){
+  const spec=SWEEPABLE.find(x=>x.k===$('swParam').value)||SWEEPABLE[0];
+  const met=METRICS.find(x=>x.k===$('swMetric').value)||METRICS[0];
+  const phs=$('swPhs').value==='with';
+  let lo=parseFloat($('swMin').value), hi=parseFloat($('swMax').value);
+  if(!isFinite(lo))lo=spec.min; if(!isFinite(hi))hi=spec.max;
+  if(hi<lo){const t=lo;lo=hi;hi=t;}
+  let steps=Math.max(2,Math.min(200,parseInt($('swSteps').value||'25',10)));
+
+  const xs=[];
+  for(let i=0;i<steps;i++){
+    let v=lo+(hi-lo)*i/(steps-1);
+    if(spec.int)v=Math.round(v);
+    if(!xs.length||v!==xs[xs.length-1])xs.push(v);
+  }
+  const series=MCS_TABLE.map(()=>[]);
+  let invalid=0;
+  xs.forEach(v=>{
+    const res=compute({...cfg,[spec.k]:v});
+    res.rows.forEach((r,i)=>{
+      const y=met.f(r,phs);
+      const bad=phs?r.overWith:r.overNo;
+      if(bad)invalid++;
+      series[i].push({x:v,y:isFinite(y)?y:null,bad});
+    });
+  });
+
+  const W=760,H=340,padL=68,padR=12,padT=16,padB=44;
+  const ys=series.flat().map(p=>p.y).filter(y=>y!==null&&isFinite(y));
+  let yMin=Math.min(...ys), yMax=Math.max(...ys);
+  if(!isFinite(yMin)||!isFinite(yMax)){$('swChart').innerHTML='';$('swMeta').textContent='No finite values in this range.';return;}
+  if(yMin===yMax){yMax=yMin+1;}
+  yMin=Math.min(yMin,0)===0&&yMin>=0?0:yMin;
+  const X=v=>padL+(W-padL-padR)*(xs.length<2?0:(v-lo)/((hi-lo)||1));
+  const Y=v=>H-padB-(H-padB-padT)*(v-yMin)/((yMax-yMin)||1);
+  const fmt=v=>Math.abs(v)>=1000?(v/1000).toFixed(v>=10000?0:1)+'k':(Math.abs(v)>=10?v.toFixed(0):v.toFixed(2));
+
+  let g='';
+  for(let i=0;i<=5;i++){
+    const v=yMin+(yMax-yMin)*i/5, y=Y(v);
+    g+=`<line class="axis" x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}"/>`;
+    g+=`<text class="chart-label" x="${padL-7}" y="${(y+3).toFixed(1)}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const tickN=Math.min(8,xs.length);
+  for(let i=0;i<tickN;i++){
+    const v=lo+(hi-lo)*i/(tickN-1), x=X(v);
+    g+=`<text class="chart-label" x="${x.toFixed(1)}" y="${H-padB+16}" text-anchor="middle">${spec.int?Math.round(v):v.toFixed(1)}</text>`;
+  }
+  g+=`<text class="chart-label" x="${(W/2).toFixed(0)}" y="${H-8}" text-anchor="middle">${spec.n}</text>`;
+  g+=`<text class="chart-label" x="14" y="${(H/2).toFixed(0)}" text-anchor="middle" transform="rotate(-90 14 ${(H/2).toFixed(0)})">${met.n}</text>`;
+
+  series.forEach((pts,i)=>{
+    const d=pts.filter(p=>p.y!==null).map((p,j)=>`${j?'L':'M'}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+    g+=`<path d="${d}" fill="none" stroke="${SERIES_COLORS[i]}" stroke-width="2" stroke-linejoin="round"/>`;
+    pts.forEach(p=>{ if(p.y!==null&&p.bad)
+      g+=`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="2.6" fill="#fff" stroke="${SERIES_COLORS[i]}" stroke-width="1.4"><title>${MCS_TABLE[i].name} @ ${p.x}: ${fmt(p.y)} — payload exceeds burst capacity</title></circle>`;});
+  });
+  $('swChart').innerHTML=g;
+  $('swLegend').innerHTML=MCS_TABLE.map((m,i)=>
+    `<span><span class="sw" style="background:${SERIES_COLORS[i]}"></span>${m.name}</span>`).join('')+
+    `<span><span class="sw" style="background:#fff;border:1.4px solid var(--ink-3);border-radius:50%"></span>point exceeds burst capacity</span>`;
+  $('swMeta').textContent=`${xs.length} points from ${lo} to ${hi}, all other parameters held at current values.`+
+    (invalid?`  ${invalid} point(s) exceed per-burst capacity — hollow markers.`:'');
+}
+
+function syncSweepRange(reset){
+  const spec=SWEEPABLE.find(x=>x.k===$('swParam').value)||SWEEPABLE[0];
+  if(reset){$('swMin').value=spec.min;$('swMax').value=spec.max;}
+}
+
+function renderStats(cfg,res){
+  const d=res.derived;
+  const best=res.rows.reduce((a,r)=>r.iperfNo>a.iperfNo?r:a,res.rows[0]);
+  $('statStrip').innerHTML=`
+    <div class="stat"><div class="k">Slot duration</div><div class="v">${f2(d.slotDuration_ms)} <small>ms</small></div></div>
+    <div class="stat"><div class="k">Data slots / burst</div><div class="v">${f0(d.slotsAvailRep)}</div></div>
+    <div class="stat"><div class="k">Bursts / sec (max CO)</div><div class="v">${f3(d.burstsPerSec)}</div></div>
+    <div class="stat"><div class="k">Repetition</div><div class="v">${d.repetitions}×</div></div>
+    <div class="stat"><div class="k">Peak iperf (no PHS)</div><div class="v">${kbps(best.iperfNo)}</div><div class="k" style="margin-top:2px;text-transform:none;letter-spacing:0">${best.mcs}</div></div>`;
+}
+
+function renderTimeline(cfg,res){
+  const d=res.derived,row=res.rows[tlMcsIdx]||res.rows[0];
+  const phs=tlPhs==='with';
+  const dataSlots=phs?row.slotsWith:row.slotsNo;
+  const preMs=1000*d.symGainPreamble*d.symbolSize/d.samplingRate;
+  const ctrlMs=d.slotsCtrlMsg*d.slotDuration_ms;   // ctrl already inside data slot count? No: L includes ctrl slots
+  // slotsNo (L) = ctrl slots + padded PDU slots (× repetition). Split for display:
+  const pduSlots=Math.max(dataSlots-d.slotsCtrlMsg*d.repetitions,0);
+  const ctrlSlots=Math.min(d.slotsCtrlMsg*d.repetitions,dataSlots);
+  const pduMs=pduSlots*d.slotDuration_ms;
+  const ctrl2Ms=ctrlSlots*d.slotDuration_ms;
+  const macAckMs=cfg.ackEnable?d.ackBurstDur:0;
+  const gapMs=cfg.minInterBurstGap;
+  const total=preMs+ctrl2Ms+pduMs+macAckMs+gapMs;
+  const pc=x=>(100*x/total).toFixed(3)+'%';
+  $('timeline').innerHTML=`
+    <div class="seg pre" style="width:${pc(preMs)}" title="Gain + preamble ${f2(preMs)} ms"></div>
+    <div class="seg ctrl" style="width:${pc(ctrl2Ms)}" title="CTRL-MSG ${f2(ctrl2Ms)} ms"></div>
+    <div class="seg data ${phs?'phs':''}" style="width:${pc(pduMs)}" title="Data ${f2(pduMs)} ms"></div>
+    <div class="seg macack" style="width:${pc(macAckMs)}" title="MAC ACK burst ${f2(macAckMs)} ms"></div>
+    <div class="seg gap" style="width:${pc(gapMs)}" title="Inter-burst gap ${f2(gapMs)} ms"></div>`;
+  $('tlDataSw').style.background=phs?'var(--with-phs)':'var(--no-phs)';
+  const burstMs=phs?row.burstDurWith:row.burstDurNo;
+  const bps=phs?row.burstsPerSecWith:row.burstsPerSecNo;
+  $('tlMeta').textContent=
+    `burst ${f2(burstMs)} ms  ·  gain+preamble ${f2(preMs)} ms  ·  ctrl ${ctrlSlots} slot(s)  ·  data ${pduSlots} slot(s)  ·  MAC ACK ${f2(macAckMs)} ms  ·  gap ${f2(gapMs)} ms  →  ${f3(bps)} bursts/s`;
+}
+
+function renderChart(res){
+  const rows=res.rows;
+  const W=720,H=240,padL=52,padB=34,padT=14,padR=8;
+  const maxV=Math.max(1,...rows.map(r=>Math.max(r.iperfNo,r.iperfWith)));
+  const cw=(W-padL-padR)/rows.length;
+  const bw=Math.min(26,cw*0.28);
+  let s='';
+  // gridlines
+  for(let g=0;g<=4;g++){
+    const v=maxV*g/4,y=H-padB-(H-padB-padT)*g/4;
+    s+=`<line class="axis" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"/>`;
+    s+=`<text class="chart-label" x="${padL-6}" y="${y+3}" text-anchor="end">${v>=1000?(v/1000).toFixed(1)+'k':Math.round(v)}</text>`;
+  }
+  rows.forEach((r,i)=>{
+    const cx=padL+cw*i+cw/2;
+    const h1=(H-padB-padT)*r.iperfNo/maxV,h2=(H-padB-padT)*r.iperfWith/maxV;
+    s+=`<rect class="bar-no" x="${cx-bw-2}" y="${H-padB-h1}" width="${bw}" height="${h1}" rx="2"><title>${r.mcs} no PHS: ${r.iperfNo} bps</title></rect>`;
+    s+=`<rect class="bar-with" x="${cx+2}" y="${H-padB-h2}" width="${bw}" height="${h2}" rx="2"><title>${r.mcs} with PHS: ${r.iperfWith} bps</title></rect>`;
+    s+=`<text class="chart-val" x="${cx-bw/2-2}" y="${H-padB-h1-4}" text-anchor="middle">${r.iperfNo}</text>`;
+    s+=`<text class="chart-val" x="${cx+bw/2+2}" y="${H-padB-h2-4}" text-anchor="middle">${r.iperfWith}</text>`;
+    s+=`<text class="chart-label" x="${cx}" y="${H-padB+16}" text-anchor="middle">${r.mcs}</text>`;
+  });
+  s+=`<text class="chart-label" x="${padL-40}" y="${padT-2}" text-anchor="start">bps</text>`;
+  $('chart').innerHTML=s;
+}
+
+function renderThroughput(res){
+  const rows=res.rows;let html='';
+  if(tpTab==='tpAgg'){
+    html=`<thead><tr><th>MCS</th><th>Bytes/slot</th><th>Max payload (B)</th>
+      <th class="hl-no">iperf no PHS</th><th class="hl-with">iperf with PHS</th>
+      <th class="hl-no">Traffic int. no PHS (s)</th><th class="hl-with">Traffic int. with PHS (s)</th></tr></thead><tbody>`;
+    rows.forEach(r=>{html+=`<tr class="${r.overNo?'row-invalid':''}"><td>${r.mcs}</td><td>${r.bytesPerSlot}</td><td>${f0(r.maxPayload)}</td>
+      <td class="hl-no">${kbps(r.iperfNo)}</td><td class="hl-with">${kbps(r.iperfWith)}</td>
+      <td class="hl-no">${r.trafficIntNo.toFixed(6)}</td><td class="hl-with">${r.trafficIntWith.toFixed(6)}</td></tr>`;});
+    $('tpNote').textContent='Aggregate iperf throughput after duty cycle, traffic type and pair count. Traffic interval is the minimum spacing between packets at the offered load, including the ARP packet-duration term.';
+  }else if(tpTab==='tpPeer'){
+    html=`<thead><tr><th>MCS</th>
+      <th class="hl-no">Per-peer no PHS</th><th class="hl-with">Per-peer with PHS</th>
+      <th class="hl-no">Traffic int./peer no PHS (s)</th><th class="hl-with">Traffic int./peer with PHS (s)</th></tr></thead><tbody>`;
+    rows.forEach(r=>{html+=`<tr><td>${r.mcs}</td>
+      <td class="hl-no">${kbps(r.perPeerNo)}</td><td class="hl-with">${kbps(r.perPeerWith)}</td>
+      <td class="hl-no">${r.trafficIntPeerNo.toFixed(6)}</td><td class="hl-with">${r.trafficIntPeerWith.toFixed(6)}</td></tr>`;});
+    $('tpNote').textContent='Throughput divided across the configured number of peers, with the sync-message airtime deduction applied.';
+  }else if(tpTab==='tpPkt'){
+    const proto=readForm().protocol, hasAck=PROTOCOLS[proto].ackBits>0;
+    html=`<thead><tr><th>MCS</th>
+      <th class="hl-no">${proto} pkts/min no PHS</th><th class="hl-with">${proto} pkts/min with PHS</th>`+
+      (hasAck?`<th class="hl-no">incl. TCP ACK no PHS</th><th class="hl-with">incl. TCP ACK with PHS</th>`:'')+
+      `</tr></thead><tbody>`;
+    rows.forEach(r=>{html+=`<tr><td>${r.mcs}</td>
+      <td class="hl-no">${f0(r.pktNo)}</td><td class="hl-with">${f0(r.pktWith)}</td>`+
+      (hasAck?`<td class="hl-no">${f0(r.pktAckNo)}</td><td class="hl-with">${f0(r.pktAckWith)}</td>`:'')+`</tr>`;});
+    $('tpNote').textContent=PROTOCOLS[proto].note;
+  }else{
+    html=`<thead><tr><th>MCS</th><th class="hl-no">PDU no PHS (B)</th><th class="hl-with">PDU with PHS (B)</th>
+      <th class="hl-no">Slots/burst no PHS</th><th class="hl-with">Slots/burst with PHS</th>
+      <th class="hl-no">Burst dur no PHS (ms)</th><th class="hl-with">Burst dur with PHS (ms)</th>
+      <th class="hl-no">Bursts/s no PHS</th><th class="hl-with">Bursts/s with PHS</th></tr></thead><tbody>`;
+    rows.forEach(r=>{html+=`<tr><td>${r.mcs}</td><td class="hl-no">${f0(r.pduNo)}</td><td class="hl-with">${f0(r.pduWith)}</td>
+      <td class="hl-no">${f0(r.slotsNo)}</td><td class="hl-with">${f0(r.slotsWith)}</td>
+      <td class="hl-no">${f2(r.burstDurNo)}</td><td class="hl-with">${f2(r.burstDurWith)}</td>
+      <td class="hl-no">${f3(r.burstsPerSecNo)}</td><td class="hl-with">${f3(r.burstsPerSecWith)}</td></tr>`;});
+    $('tpNote').textContent='Slot counts include CTRL-MSG slots and repetition. PDU sizes include IP/Ethernet/UDP and PDU-header overhead (payload header suppression removes 32 bytes).';
+  }
+  $('tpTable').innerHTML=html+'</tbody>';
+}
+
+function renderRTT(res){
+  const w=latMode==='with';let html=`<thead><tr><th>MCS</th><th>Best RTT (ms)</th><th>Average RTT (ms)</th><th>Worst RTT (ms)</th><th>Min ping interval (ms)</th><th>Status</th></tr></thead><tbody>`;
+  res.rows.forEach(r=>{
+    const st=w?r.statusWith:r.statusNo;
+    html+=`<tr><td>${r.mcs}</td><td>${f2(w?r.bestRTT_with:r.bestRTT_no)}</td><td>${f2(w?r.avgRTT_with:r.avgRTT_no)}</td>
+      <td>${f2(w?r.worstRTT_with:r.worstRTT_no)}</td><td>${f2(w?r.minPing_with:r.minPing_no)}</td>
+      <td style="text-align:left"><span class="pill ${st.replace(' ','')}">${st}</span></td></tr>`;});
+  $('rttTable').innerHTML=html+'</tbody>';
+}
+
+function renderOW(res){
+  const w=owMode==='with';let html=`<thead><tr><th>MCS</th><th>Best one-way (ms)</th><th>Average one-way (ms)</th><th>Worst one-way (ms)</th></tr></thead><tbody>`;
+  res.rows.forEach(r=>{html+=`<tr><td>${r.mcs}</td><td>${f2(w?r.bestOW_with:r.bestOW_no)}</td>
+    <td>${f2(w?r.avgOW_with:r.avgOW_no)}</td><td>${f2(w?r.worstOW_with:r.worstOW_no)}</td></tr>`;});
+  $('owTable').innerHTML=html+'</tbody>';
+}
+
+function renderDerived(res){
+  const d=res.derived;
+  const items=[
+    ['Transport header (protocol)',f0(d.transport)+' B'],
+    ['Total PDU overhead',f0(d.ovhConcat)+' B'],
+    ['Total PDU overhead incl. packing',f0(d.ovhPacking)+' B'],
+    ['Bytes suppressed by PHS',f0(d.suppressed)+' B'],
+    ['Symbol size (samples)',f0(d.symbolSize)],['Sampling rate (Hz)',f0(d.samplingRate)],
+    ['Symbol duration (µs)',f2(d.symbolDuration_us)],['Symbols per slot',f0(d.symbolsPerSlot)],
+    ['Samples per slot',f0(d.samplesPerSlot)],['Slot duration (ms)',f3(d.slotDuration_ms)],
+    ['Robust MCS bytes/slot',f0(d.robustBytesPerSlot)],['Slots for CTRL-MSG',f0(d.slotsCtrlMsg)],
+    ['Symbols: gain + preamble',f0(d.symGainPreamble)],['Symbols: gain + sync + ctrl',f0(d.symGainSyncCtrl)],
+    ['Slots: gain + sync + ctrl',d.slotsGSC.toFixed(4)],['Burst duration @ max CO (ms)',f2(d.burstDurMaxCO)],
+    ['Data slots per burst @ max CO',f0(d.slotsDataPerBurst)],['Burst duration + gap (ms)',f2(d.burstDurWithGap)],
+    ['Bursts per second',d.burstsPerSec.toFixed(6)],['Data slots per second',f0(d.dataSlotsPerSec)],
+    ['Repetitions',d.repetitions+'×'],['Slots available for data (per repetition)',f0(d.slotsAvailRep)],
+    ['MAC ACK / sync msg slots (fixed)',f0(d.ackSyncSlots)],['MAC ACK burst duration (ms)',f2(d.ackBurstDur)],
+    ['Burst duration with code transmission (ms)',f2(d.burstDurCode)],
+  ];
+  let html='<thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>';
+  items.forEach(([k,v])=>html+=`<tr><td>${k}</td><td>${v}</td></tr>`);
+  $('dpTable').innerHTML=html+'</tbody>';
+}
+
+/* ════════ WIRING ════════ */
+let tipBox=null;
+function ensureTipBox(){
+  if(tipBox)return tipBox;
+  tipBox=document.createElement('div');
+  tipBox.className='tipbox';
+  tipBox.setAttribute('role','tooltip');
+  document.body.appendChild(tipBox);
+  return tipBox;
+}
+function hideTip(){ if(tipBox)tipBox.classList.remove('on'); }
+function showTip(q){
+  const box=ensureTipBox();
+  box.innerHTML=q.dataset.tip||'';
+  box.classList.add('on');
+  // measure, then place inside the viewport
+  box.style.left='0px'; box.style.top='0px';
+  const r=q.getBoundingClientRect(), b=box.getBoundingClientRect();
+  const M=10, vw=document.documentElement.clientWidth, vh=document.documentElement.clientHeight;
+  let x=r.right+8;
+  if(x+b.width>vw-M) x=r.left-b.width-8;        // flip to the left side
+  if(x<M) x=Math.max(M,(vw-b.width)/2);          // still no room: centre it
+  let y=r.top-4;
+  if(y+b.height>vh-M) y=vh-b.height-M;           // lift so the bottom is visible
+  if(y<M) y=M;
+  box.style.left=x+'px'; box.style.top=y+'px';
+}
+document.addEventListener('scroll',hideTip,true);
+window.addEventListener('resize',hideTip);
+document.addEventListener('click',e=>{ if(!e.target.closest('.qmark'))hideTip(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')hideTip(); });
+
+function injectHelp(){
+  Object.keys(HELP).forEach(k=>{
+    const el=$(k); if(!el)return;
+    const lab=document.querySelector(`label[for="${k}"]`); if(!lab||lab.querySelector('.qmark'))return;
+    const h=HELP[k];
+    const q=document.createElement('span');
+    q.className='qmark'; q.textContent='?'; q.tabIndex=0;
+    q.setAttribute('role','button');
+    q.setAttribute('aria-label','Help for '+lab.textContent.trim());
+    q.dataset.tip=`<b>${lab.textContent.trim()}</b>${h.u?` <i>(${h.u})</i>`:''}<br>${h.d}<br><u>Drives:</u> ${h.drives}`;
+    q.addEventListener('mouseenter',()=>showTip(q));
+    q.addEventListener('mouseleave',hideTip);
+    q.addEventListener('focus',()=>showTip(q));
+    q.addEventListener('blur',hideTip);
+    q.addEventListener('click',e=>{e.stopPropagation();tipBox&&tipBox.classList.contains('on')?hideTip():showTip(q);});
+    lab.appendChild(q);
+  });
+}
+
+function renderGlossary(){
+  const box=$('glossBody'); if(!box||box.dataset.done)return;
+  const order=Object.keys(HELP);
+  box.innerHTML=order.map(k=>{
+    const h=HELP[k];
+    const lab=document.querySelector(`label[for="${k}"]`);
+    const name=lab?lab.textContent.replace('?','').trim():k;
+    const unused=/not modelled/i.test(h.drives);
+    return `<tr class="${unused?'gloss-unused':''}"><td>${name}</td><td class="gmono">${k}</td><td>${h.u||'—'}</td><td class="gdesc">${h.d}</td><td class="gdesc">${h.drives}</td></tr>`;
+  }).join('');
+  box.dataset.done='1';
+}
+
+function wire(){
+  // top-level panel tabs
+  document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('[data-panel]').forEach(x=>{
+      const on=x===b;
+      x.classList.toggle('on',on);
+      x.setAttribute('aria-selected',on?'true':'false');
+      document.getElementById(x.dataset.panel).classList.toggle('on',on);
+    });
+    render();
+  }));
+
+  // MCS selector for timeline
+  $('tlMcs').innerHTML=MCS_TABLE.map((m,i)=>`<option value="${i}">${m.name}</option>`).join('');
+  $('tlMcs').addEventListener('change',e=>{tlMcsIdx=+e.target.value;render();});
+  $('tlNo').addEventListener('click',()=>{tlPhs='no';$('tlNo').classList.add('on');$('tlWith').classList.remove('on');render();});
+  $('tlWith').addEventListener('click',()=>{tlPhs='with';$('tlWith').classList.add('on');$('tlNo').classList.remove('on');render();});
+
+  document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{
+    tpTab=b.dataset.tab;
+    document.querySelectorAll('[data-tab]').forEach(x=>x.classList.toggle('on',x===b));render();}));
+  document.querySelectorAll('[data-lat]').forEach(b=>b.addEventListener('click',()=>{
+    latMode=b.dataset.lat;
+    document.querySelectorAll('[data-lat]').forEach(x=>x.classList.toggle('on',x===b));render();}));
+  document.querySelectorAll('[data-ow]').forEach(b=>b.addEventListener('click',()=>{
+    owMode=b.dataset.ow;
+    document.querySelectorAll('[data-ow]').forEach(x=>x.classList.toggle('on',x===b));render();}));
+
+  for(const k in DEFAULTS){
+    const el=$(k); if(!el)continue;
+    el.addEventListener('input',render);
+    el.addEventListener('change',render);
+  }
+  $('btnDefaults').addEventListener('click',()=>{setForm(DEFAULTS);render();});
+  $('btnCSV').addEventListener('click',downloadCSV);
+  injectHelp();
+  $('swParam').innerHTML=SWEEPABLE.map(x=>`<option value="${x.k}">${x.n}</option>`).join('');
+  $('swMetric').innerHTML=METRICS.map(x=>`<option value="${x.k}">${x.n}</option>`).join('');
+  syncSweepRange(true);
+  $('swParam').addEventListener('change',()=>{syncSweepRange(true);render();});
+  ['swMin','swMax','swSteps','swMetric','swPhs'].forEach(id=>{
+    $(id).addEventListener('input',render); $(id).addEventListener('change',render);});
+  $('cmdMcs').innerHTML=MCS_TABLE.map((m,i)=>`<option value="${i}">${m.name}</option>`).join('');
+  ['cmdMcs','cmdPhs','cmdHost','cmdDur'].forEach(id=>{
+    $(id).addEventListener('input',render); $(id).addEventListener('change',render);});
+}
+
+setForm(DEFAULTS);
+wire();
+render();
+</script>
+</body>
+</html>
